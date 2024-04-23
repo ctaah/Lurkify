@@ -1,98 +1,195 @@
 import os
-import discord
 import asyncio
-from discord.ext import commands
-import colorama
+import discord
 from colorama import Fore, Style
+
+
+import colorama
 colorama.init()
 
-bot = commands.Bot(command_prefix='!')
 
-@bot.event
-async def on_ready():
-    print('Bot is ready.')
-    await main_menu()
+intents = discord.Intents.all()
 
-async def main_menu():
-    while True:
-        print("\n--- Main Menu ---")
-        print("1. Print messages from a server")
-        print("2. Change bot status")
-        print("3. Exit")
 
-        choice = input("Enter your choice: ")
+async def change_status(client):
+    print("\nSelect the type of activity:")
+    print("1. Playing")
+    print("2. Listening")
+    print("3. Streaming")
+    choice = int(input("Enter your choice: "))
 
-        if choice == "1":
-            await print_server_messages()
-        elif choice == "2":
-            await change_status()
-        elif choice == "3":
-            print("Exiting bot.")
-            break
+    if choice == 1:
+        activity_title = input("Enter the title for Playing activity: ")
+        await client.change_presence(activity=discord.Game(name=activity_title))
+        print(Fore.GREEN + f"\nStatus changed to Playing {activity_title}" + Style.RESET_ALL)
+    elif choice == 2:
+        activity_title = input("Enter the title for Listening activity: ")
+        await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=activity_title))
+        print(Fore.GREEN + f"\nStatus changed to Listening {activity_title}" + Style.RESET_ALL)
+    elif choice == 3:
+        activity_title = input("Enter the title for Streaming activity: ")
+        activity_url = input("Enter the URL for Streaming activity: ")
+        await client.change_presence(activity=discord.Streaming(name=activity_title, url=activity_url))
+        print(Fore.GREEN + f"\nStatus changed to Streaming {activity_title} at {activity_url}" + Style.RESET_ALL)
+
+
+async def check_administrator_permissions(client):
+    for guild in client.guilds:
+        permissions = guild.me.guild_permissions
+        if permissions.administrator:
+            print(Fore.LIGHTBLUE_EX + f"{guild.name} - ID: {guild.id} - ADMINISTRATOR PERMISSIONS ENABLED" + Style.RESET_ALL)
         else:
-            print("Invalid choice. Please enter a valid option.")
-
-async def print_server_messages():
-    servers = bot.guilds
-
-    print("\n--- Servers ---")
-    for index, server in enumerate(servers, 1):
-        print(f"{index}. {server.name}")
-
-    server_choice = input("Enter the number corresponding to the server you want to scrape: ")
-
-    try:
-        server_index = int(server_choice) - 1
-        selected_server = servers[server_index]
-
-        print(f"Scraping messages from {selected_server.name}...")
-        await scrape_server_messages(selected_server)
-    except (ValueError, IndexError):
-        print("Invalid input. Please enter a valid server number.")
-
-async def scrape_server_messages(server):
-    text_channels = [channel for channel in server.channels if isinstance(channel, discord.TextChannel)]
-
-    print("\n--- Available Channels ---")
-    for index, channel in enumerate(text_channels, 1):
-        print(f"{index}. {channel.name}")
-
-    channel_choice = input("Enter the number corresponding to the channel you want to scrape: ")
-
-    try:
-        channel_index = int(channel_choice) - 1
-        selected_channel = text_channels[channel_index]
-
-        message_count = int(input("Enter the number of messages to print: "))
-
-        print(f"\n{Fore.RED}--- Messages from #{selected_channel.name} ---{Style.RESET_ALL}")
-        messages = []
-        async for message in selected_channel.history(limit=message_count):
-            if not message.author.bot:
-                messages.append(message)
+            print(Fore.LIGHTRED_EX + f"{guild.name} - ID: {guild.id} - NO ADMINISTRATOR PERMISSIONS" + Style.RESET_ALL)
 
 
-        sorted_messages = sorted(messages, key=lambda msg: msg.created_at)
+async def print_channel_messages(client):
+    
+    print("\nSelect a server:")
+    for i, guild in enumerate(client.guilds):
+        print(f"{i + 1}. {guild.name}")
 
-        for message in sorted_messages:
-            print(f"{Fore.MAGENTA}Author: {Fore.CYAN}{message.author.display_name}{Style.RESET_ALL}")
-            print(f"{Fore.YELLOW}Timestamp: {Fore.GREEN}{message.created_at}{Style.RESET_ALL}")
-            print(f"Content: {message.content}")
-            print("---------------------")
+    server_choice = int(input("Enter your choice: ")) - 1
+    selected_guild = client.guilds[server_choice]
 
-            if message.attachments:
-                print(f"\n{Fore.RED}--- MEDIA ---{Style.RESET_ALL}")
-                for attachment in message.attachments:
-                    if attachment.url:
-                        print(f"{Fore.RED}{attachment.url}{Style.RESET_ALL}")
-                    else:
-                        print(f"{Fore.RED}[Media Link]{Style.RESET_ALL}")
-    except (ValueError, IndexError):
-        print("Invalid input. Please enter valid numbers.")
+    
+    print("\nSelect a channel:")
+    for i, channel in enumerate(selected_guild.text_channels):
+        print(f"{i + 1}. {channel.name}")
 
-async def change_status():
-    new_status = input("Enter the new status: ")
-    await bot.change_presence(status=discord.Status.idle, activity=discord.Game(name=new_status))
-    print(f"Bot status changed to 'Away' with custom playing status '{new_status}'.")
+    channel_choice = int(input("Enter your choice: ")) - 1
+    selected_channel = selected_guild.text_channels[channel_choice]
 
-bot.run('PROVIDE-TOKEN', bot=True)
+    
+    num_messages = int(input("Enter the number of messages to print: "))
+
+    
+    async for message in selected_channel.history(limit=num_messages):
+        print(f"{message.created_at.strftime('%Y-%m-%d %H:%M:%S')} {message.author}: {message.content}")
+
+
+async def send_message_with_attachments(client):
+    
+    print("\nSelect a server:")
+    for i, guild in enumerate(client.guilds):
+        print(f"{i + 1}. {guild.name}")
+
+    server_choice = int(input("Enter your choice: ")) - 1
+    selected_guild = client.guilds[server_choice]
+
+    
+    print("\nSelect a channel:")
+    for i, channel in enumerate(selected_guild.text_channels):
+        print(f"{i + 1}. {channel.name}")
+
+    channel_choice = int(input("Enter your choice: ")) - 1
+    selected_channel = selected_guild.text_channels[channel_choice]
+
+    
+    message_content = input("Enter the message content: ")
+
+    
+    has_attachments = input("Does the message have attachments? (yes/no): ").lower() == 'yes'
+
+    
+    files = []
+    if has_attachments:
+        num_attachments = int(input("Enter the number of attachments: "))
+        for i in range(num_attachments):
+            file_path = input(f"Enter the file path for attachment {i + 1}: ")
+            file = discord.File(file_path)
+            files.append(file)
+
+    
+    await selected_channel.send(content=message_content, files=files)
+
+
+
+async def print_ban_list(client):
+    for guild in client.guilds:
+        print(f"\nBans in {guild.name}:")
+        try:
+            bans = guild.bans()
+            for ban_entry in bans:
+                user = ban_entry.user
+                print(f"{user.name} - {user.id}")
+        except discord.Forbidden:
+            print("Missing permissions to view bans")
+        except discord.HTTPException as e:
+            print(f"An error occurred while fetching bans: {e}")
+
+
+
+async def handle_events(client):
+    
+    print(Fore.YELLOW + f"\nLogged in as {client.user}" + Style.RESET_ALL)
+
+    
+    while True:
+        print("\nUser Menu:")
+        print("1. Change status")
+        print("2. Check server permissions")
+        print("3. Print messages from server")
+        print("4. Send message with attachments")
+        print("5. Print ban list from all servers")
+        print("6. Logout")
+
+        choice = int(input("Enter your choice: "))
+
+        if choice == 1:
+            await change_status(client)
+            await asyncio.sleep(1)  
+            os.system('cls' if os.name == 'nt' else 'clear')  
+        elif choice == 2:
+            await check_administrator_permissions(client)
+            input("\nPress Enter to continue...")
+            os.system('cls' if os.name == 'nt' else 'clear')  
+        elif choice == 3:
+            await print_channel_messages(client)
+            input("\nPress Enter to continue...")
+            os.system('cls' if os.name == 'nt' else 'clear')  
+        elif choice == 4:
+            await send_message_with_attachments(client)
+            input("\nPress Enter to continue...")
+            os.system('cls' if os.name == 'nt' else 'clear')  
+        elif choice == 5:
+            await print_ban_list(client)
+            input("\nPress Enter to continue...")
+            os.system('cls' if os.name == 'nt' else 'clear')  
+        elif choice == 6:
+            print(Fore.RED + "\nLogging out..." + Style.RESET_ALL)
+            await client.close()
+            break
+
+
+class MyClient(discord.Client):
+    async def on_ready(self):
+        await handle_events(self)
+
+
+client = MyClient(intents=intents)
+
+
+async def main():
+    while True:
+        try:
+            
+            os.system('cls' if os.name == 'nt' else 'clear')
+
+            
+            token = input("Enter your Discord bot token: ")
+
+            print(Fore.YELLOW + "\nLogging in..." + Style.RESET_ALL)
+
+            
+            await client.start(token)
+        except KeyboardInterrupt:
+            print(Fore.RED + "\nLogging out..." + Style.RESET_ALL)
+            await client.close()
+            break
+        except Exception as e:
+            print(Fore.RED + f"\nAn error occurred: {e}" + Style.RESET_ALL)
+            input("Press Enter to continue...")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
